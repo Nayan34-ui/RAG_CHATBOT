@@ -52,7 +52,11 @@ if st.button("🔨 Build Knowledge Base", type="primary"):
                 splitter = CharacterTextSplitter(chunk_size=500, chunk_overlap=50)
                 chunks = splitter.split_documents(documents)
 
-                embedding_model = HuggingFaceEmbeddings(model="llama-3.3-70b-versatile")
+                embedding_model = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/all-MiniLM-L6-v2",
+    model_kwargs={"device": "cpu"},
+    encode_kwargs={"normalize_embeddings": True}
+)
                 vector_db = FAISS.from_documents(chunks, embedding_model)
                 st.session_state.vector_db = vector_db
                 st.session_state.chat_history = []
