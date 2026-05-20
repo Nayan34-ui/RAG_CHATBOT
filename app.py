@@ -3,6 +3,7 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import CharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
+from groq import Groq
 import tempfile
 import os
 
@@ -13,14 +14,14 @@ st.set_page_config(
 )
 
 st.title("🤖 RAG Document Chatbot")
-st.caption("Upload a PDF and ask questions from it — powered by HuggingFace Embeddings + FAISS")
+st.caption("Upload a PDF and ask questions — powered by HuggingFace + FAISS + Groq")
 
 with st.sidebar:
     st.header("⚙️ How to use")
     st.markdown("""
     1. Upload a PDF file
     2. Click **Build Knowledge Base**
-    3. Ask any question about the document!
+    3. Ask any question!
     """)
     st.markdown("---")
     st.markdown("Built by **Nayan Kadu**")
@@ -30,6 +31,8 @@ if "vector_db" not in st.session_state:
     st.session_state.vector_db = None
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
+
+GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
 
 uploaded_file = st.file_uploader("Upload a PDF file", type=["pdf"])
 
@@ -53,12 +56,11 @@ if st.button("🔨 Build Knowledge Base", type="primary"):
                 vector_db = FAISS.from_documents(chunks, embedding_model)
                 st.session_state.vector_db = vector_db
                 st.session_state.chat_history = []
-
                 os.unlink(tmp_path)
-                st.success(f"✅ Knowledge base built from {len(chunks)} chunks! Now ask your questions below.")
+                st.success(f"✅ Knowledge base ready! {len(chunks)} chunks indexed.")
 
             except Exception as e:
-                st.error(f"Error building knowledge base: {e}")
+                st.error(f"Error: {e}")
 
 if st.session_state.vector_db:
     st.markdown("---")
@@ -76,16 +78,25 @@ if st.session_state.vector_db:
             st.write(question)
 
         with st.chat_message("assistant"):
-            with st.spinner("Searching document..."):
+            with st.spinner("Thinking..."):
                 try:
                     relevant_docs = st.session_state.vector_db.similarity_search(question, k=3)
-                    answer = ""
-                    for i, doc in enumerate(relevant_docs, 1):
-                        answer += f"**Chunk {i}:**\n{doc.page_content}\n\n"
-                    st.markdown(answer)
+                    context = "\n\n".join([doc.page_content for doc in relevant_docs])
+
+                    client = Groq(api_key=GROQ_API_KEY)
+                    response = client.chat.completions.create(
+                        model="llama3-8b-8192",
+                        messages=[
+                            {"role": "system", "content": "You are a helpful assistant. Answer the question based only on the provided context. Be concise and clear."},
+                            {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"}
+                        ]
+                    )
+                    answer = response.choices[0].message.content
+                    st.write(answer)
                     st.session_state.chat_history.append({"role": "assistant", "content": answer})
+
                 except Exception as e:
-                    st.error(f"Error searching: {e}")
+                    st.error(f"Error: {e}")
 
 elif uploaded_file is None:
     st.info("👆 Upload a PDF and click **Build Knowledge Base** to get started.")
