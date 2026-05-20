@@ -89,7 +89,7 @@ if st.session_state.vector_db:
 
                     client = Groq(api_key=GROQ_API_KEY)
                     response = client.chat.completions.create(
-                       model="mixtral-8x7b-32768",
+                      model="llama-3.3-70b-versatile",
                         messages=[
                             {"role": "system", "content": "You are a helpful assistant. Answer the question based only on the provided context. Be concise and clear."},
                             {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"}
